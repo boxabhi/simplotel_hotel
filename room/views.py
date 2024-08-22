@@ -1,7 +1,7 @@
 from rest_framework import status, viewsets
 from rest_framework.response import Response
 from .models import RoomRate, OverriddenRoomRate, Discount, DiscountRoomRate
-from .serializers import (
+from    .serializers import (
     RoomRateSerializer, OverriddenRoomRateSerializer, 
     DiscountSerializer, DiscountRoomRateSerializer
 )
@@ -59,16 +59,22 @@ class LowestRateViewSet(viewsets.ViewSet):
                 if not overridden_rate['lowest_rate']:
                     overridden_rate = {'lowest_rate': rate.default_rate}
 
-                discount = DiscountRoomRate.objects.filter(
-                    room_rate=rate
-                ).aggregate(
-                    max_discount=Min('discount__discount_value')
-                )
+                discounts = DiscountRoomRate.objects.filter(room_rate=rate).select_related('discount')
+                max_discount_value = 0
 
-                if discount['max_discount']:
-                    final_rate = overridden_rate['lowest_rate'] - discount['max_discount']
-                else:
-                    final_rate = overridden_rate['lowest_rate']
+                for discount in discounts:
+                    discount_obj = discount.discount
+                    if discount_obj.discount_type == 'percentage':
+                        discount_value = (discount_obj.discount_value / 100) * overridden_rate['lowest_rate']
+                    else:
+                        discount_value = discount_obj.discount_value
+                    
+                    if discount_value > max_discount_value:
+                        max_discount_value = discount_value
+
+
+                final_rate = overridden_rate['lowest_rate'] - max_discount_value
+
 
                 lowest_rates.append({
                     'room_id': rate.room_id,

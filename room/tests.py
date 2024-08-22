@@ -11,7 +11,7 @@ class LowestRateViewSetTests(TestCase):
         self.setup_demo_data()
 
     def setup_demo_data(self):
-
+       
         self.room1 = RoomRate.objects.create(
             room_id=101,
             room_name='Single Room',
@@ -28,7 +28,7 @@ class LowestRateViewSetTests(TestCase):
             default_rate=300.00
         )
 
-
+        
         today = timezone.now().date()
         self.overridden_rate1 = OverriddenRoomRate.objects.create(
             room_rate=self.room1,
@@ -38,24 +38,22 @@ class LowestRateViewSetTests(TestCase):
         self.overridden_rate2 = OverriddenRoomRate.objects.create(
             room_rate=self.room2,
             overridden_rate=180.00,
-            stay_date=today + timedelta(days=1)
+            stay_date=today
         )
 
-
+      
         self.discount1 = Discount.objects.create(
-            
             discount_name='Summer Sale',
             discount_type='percentage',
             discount_value=10.00
         )
         self.discount2 = Discount.objects.create(
-            
             discount_name='Weekend Discount',
             discount_type='fixed',
             discount_value=20.00
         )
 
-
+       
         DiscountRoomRate.objects.create(
             room_rate=self.room1,
             discount=self.discount1
@@ -91,7 +89,6 @@ class LowestRateViewSetTests(TestCase):
             'start_date': timezone.now().date(),
             'end_date': (timezone.now() + timedelta(days=1)).date()
         })
-
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data['status'], False)
         self.assertEqual(response.data['message'], "room_ids parameter is required")
@@ -108,19 +105,26 @@ class LowestRateViewSetTests(TestCase):
         self.assertEqual(response.data['data'], [])
 
     def test_lowest_rate_endpoint_with_discounts(self):
+       
         response = self.client.get('/api/room/lowest-rates/', {
             'room_ids': '101,102',
             'start_date': timezone.now().date(),
             'end_date': (timezone.now() + timedelta(days=1)).date()
         })
-       
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('data', response.data)
 
         data = response.data['data']
-        for entry in data:
-            if entry['room_id'] == 101:
-                self.assertEqual(entry['final_rate'], 90.00 - 10.00)  
-            elif entry['room_id'] == 102:
-                self.assertEqual(entry['final_rate'], 180.00 - 20.00)  
 
+        for entry in data:
+            room_id = entry['room_id']
+            final_rate = entry['final_rate']
+            if room_id == 101:
+               
+                expected_final_rate = 90.00 - (90.00 * 0.10)
+                self.assertEqual(final_rate, expected_final_rate)
+            elif room_id == 102:
+                
+                expected_final_rate = 180.00 - 20.00
+                self.assertEqual(final_rate, expected_final_rate)
